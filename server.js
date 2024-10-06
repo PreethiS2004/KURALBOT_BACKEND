@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Thirukkural = require('./Thirukkural');
 const cors = require('cors');
-const { spawn } = require('child_process'); // Use spawn instead of exec
+const { spawn } = require('child_process');
 const path = require('path');
 
 const app = express();
@@ -12,7 +12,7 @@ const port = 5000;
 app.use(cors());
 
 // Connect to MongoDB with error handling
-mongoose.connect('mongodb://127.0.0.1:27017/thirukkural', {
+mongoose.connect('mongodb://127.0.0.1:27017/CHATBOT', {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => {
@@ -28,9 +28,14 @@ app.use(express.json());
 // Endpoint to get Kural details based on query parameters
 app.get('/api/kurals', async (req, res) => {
     try {
-        const { chapterName, sectionName, verse, translation, explanation } = req.query;
-
-        // Initialize pythonScriptArgs here
+        const { chapterName, sectionName, verse, translation, explanation,Chapter, Chapter_Eng, section_eng, section_trans} = req.query;
+    
+        // Validate input query parameters
+        if (!chapterName && !sectionName && !verse && !translation && !explanation && !Chapter_Eng && !section_eng && !section_trans && !Chapter) {
+          return res.status(400).json({ message: 'No valid query parameters provided' });
+        }
+        
+        // Initialize pythonScriptArgs
         let pythonScriptArgs = [];
 
         if (chapterName) pythonScriptArgs.push(chapterName, "chapterName");
@@ -38,15 +43,18 @@ app.get('/api/kurals', async (req, res) => {
         if (verse) pythonScriptArgs.push(verse,"verse");
         if (translation) pythonScriptArgs.push(`"${translation}"`, `"translation"`);
         if (explanation) pythonScriptArgs.push(`"${explanation}"`, `"explanation"`);
+        if (Chapter) pythonScriptArgs.push(Chapter, "Chapter");
+        if (Chapter_Eng) pythonScriptArgs.push(Chapter_Eng, "Chapter_Eng");
+        if (section_trans) pythonScriptArgs.push(section_trans, "section_trans");
+        if (section_eng) pythonScriptArgs.push(section_eng, "section_eng");
 
-        if (pythonScriptArgs.length === 0) {
-            return res.status(400).json({ message: 'No valid query parameters provided' });
-        }
+        console.log('Python script args:', pythonScriptArgs);
 
         // Execute the Python script using spawn
         const pythonScriptPath = path.join(__dirname, 'test.py');
         const pythonProcess = spawn('python', [pythonScriptPath, ...pythonScriptArgs]);
-
+        console.log('Python script path:', pythonScriptPath);
+        
         let output = '';
         let errorOutput = '';
         console.log('Python script args:', pythonScriptArgs);
@@ -75,7 +83,7 @@ app.get('/api/kurals', async (req, res) => {
         
                 const numbers = result.numbers;
                 if (!numbers || numbers.length === 0) {
-                    return res.status(404).json({ message: 'No Kural details found for the given parameters' });
+                    return res.status( 404).json({ message: 'No Kural details found for the given parameters' });
                 }
         
                 // Fetch Kural details from MongoDB
@@ -98,7 +106,6 @@ app.get('/api/kurals', async (req, res) => {
     }
 });
 
-
 // Middleware to handle 404 errors
 app.use((req, res, next) => {
     res.status(404).json({ message: 'Endpoint not found' });
@@ -114,3 +121,6 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
+
+
+

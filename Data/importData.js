@@ -1,7 +1,7 @@
 // importData.js
 const fs = require('fs');
 const mongoose = require('mongoose');
-const Thirukkural = require('./Thirukkural');
+const Thirukkural = require('../Thirukkural');
 
 
 const importData = async () => {
