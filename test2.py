@@ -135,13 +135,13 @@ def process_input(user_text, field):
     return {'numbers': best_numbers}
 
 def main():
-    if len(sys.argv) != 3:
-        print(json.dumps({"error": "Usage: python test2.py <value> <field>"}))
+    if len(sys.argv) != 4:
+        print(json.dumps({"error": "Usage: python test2.py <selectedLanguage> <value> <field>"}))
         sys.exit(1)
     
     user_text = sys.argv[1]
     field = sys.argv[2]
-    
+    selectedlanguage=sys.argv[3]
     start_time = time.time()
     
     try:
