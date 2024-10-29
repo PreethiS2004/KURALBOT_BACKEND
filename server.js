@@ -1,11 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const Questions = require('./mongodb/Questions'); // Adjust the path as needed
-const Thirukkural = require('./mongodb/Thirukkural'); // Adjust the path as needed
-const Hindi_Qns = require('./mongodb/Questions');
-const Russian_qns = require('./mongodb/Questions');
-const Hindikural =require('./mongodb/Thirukkural');
-const Russiankural=require('./mongodb/Thirukkural');
+const { Questions,Hindi_Qns,Russian_qns} = require('./mongodb/Questions'); // Adjust the path as needed
+
+const { Thirukkural, Hindikural, Russiankural } = require('./mongodb/Thirukkural');
+
 const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -108,21 +106,25 @@ app.get('/api/questions', async (req, res) => {
 // Endpoint to get Kural details based on input
 app.get('/api/kurals', async (req, res) => {
     const { selectedLanguage, chapterName, sectionName, verse, translation, explanation, Chapter, Chapter_Eng, section_eng, section_trans,chapter,chapter_group,Section,Chapter_group} = req.query;
-
+    console.log(`[DEBUG] Received request: Language = ${selectedLanguage}`);
     if (!chapterName && !sectionName && !verse && !translation && !explanation && !Chapter_Eng && !section_eng && !section_trans && !Chapter && !chapter && !Chapter_group && !Section && !chapter_group) {
         return res.status(400).json({ message: 'No valid query parameters provided' });
     }
 
-    // Select the correct Mongoose model based on the selected language
-    let KuralModel;
-    if (selectedLanguage.toLowerCase() === 'russian') {
-        KuralModel = Russiankural;  // Use Russian Kural model
-    } else if (selectedLanguage.toLowerCase() === 'hindi') {
-        KuralModel = Hindikural;  // Use Hindi Kural model
-    } else {
-        KuralModel = Thirukkural;  // Default to Tamil/English Kural model
-    }
-    
+if (selectedLanguage === 'english') {
+    KuralModel = Thirukkural;
+    console.log(`[DEBUG] KuralModel set to1: ${KuralModel.modelName}`);
+} else if (selectedLanguage === 'hindi') {
+    KuralModel = Hindikural;
+    console.log(`[DEBUG] KuralModel set to2: ${KuralModel.modelName}`);
+} else if (selectedLanguage === 'russian') {
+    KuralModel = Russiankural;  // This line is for the fallback or the Russian condition
+    console.log(`[DEBUG] KuralModel set to3: ${KuralModel.modelName}`);
+} else {
+    KuralModel = Thirukkural;  // Default case
+    console.log(`[DEBUG] KuralModel set to4: ${KuralModel.modelName}`);
+}
+
 
     // Initialize pythonScriptArgs
     let pythonScriptArgs = [];
@@ -194,10 +196,9 @@ app.get('/api/kurals', async (req, res) => {
 app.get('/api/all-details', async (req, res) => {
     try {
         const { selectedLanguage } = req.query;
+        console.log(`[DEBUG] Received request: Language = ${selectedLanguage}`);
 
-        let model; // Holds the appropriate Mongoose model based on language
-
-        // Select the correct fields and model based on the language
+        let model; 
         const groupByFields = (() => {
             switch (selectedLanguage) {
                 case 'English':
@@ -232,6 +233,7 @@ app.get('/api/all-details', async (req, res) => {
                     return res.status(400).json({ message: 'Invalid language selection' });
             }
         })();
+        console.log(`[DEBUG] KuralModel set to4: ${model.modelName}`);
 
         // Run the aggregation query
         const data = await model.aggregate([
@@ -274,7 +276,7 @@ app.get('/api/all-details', async (req, res) => {
                 $sort: { _id: 1 }
             }
         ]);
-
+        console.log('Aggregated Data:', JSON.stringify(data, null, 2));
         // Send the aggregated data as a response
         res.status(200).json(data);
     } catch (err) {

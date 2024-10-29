@@ -148,6 +148,8 @@ def main():
         collection_name = 'DETAIL1'
     elif selected_language.lower() == 'russian':
         collection_name = 'RUSSIAN_DETAIL'
+    elif selected_language.lower() == 'hindi':
+        collection_name = 'HINDI_DETAIL'
     else:
         print(json.dumps({"error": "Invalid language. Choose 'tamil' or 'english'."}))
         sys.exit(1)

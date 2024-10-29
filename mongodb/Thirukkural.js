@@ -37,7 +37,9 @@ const Thirukkural = mongoose.model('Thirukkural', thirukkuralSchema,'DETAIL1');
 const Hindikural = mongoose.model('Hindikural',hindischema,'HINDI_DETAIL');
 const Russiankural = mongoose.model('Russiankural',russianschema,'RUSSIAN_DETAIL');
 
-module.exports = Thirukkural;
-module.exports = Hindikural;
-module.exports = Russiankural; 
+module.exports = {
+    Thirukkural,
+    Hindikural,
+    Russiankural
+};
 

@@ -17,6 +17,4 @@ const Questions = mongoose.model('Questions', questionsSchema,'DETAIL2');
 const Hindi_Qns=mongoose.model('Hindi_Qns',qnsSchema,'HINDI_QUESTIONS');
 const Russian_qns=mongoose.model('Russian_Qns',qnsSchema,'RUSSIAN_QUESTIONS');
 
-module.exports = Questions;
-module.exports = Hindi_Qns;
-module.exports = Russian_qns;
+module.exports ={ Questions, Hindi_Qns, Russian_qns};
