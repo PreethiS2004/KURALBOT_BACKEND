@@ -1,7 +1,11 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const Questions = require('./Questions'); // Adjust the path as needed
-const Thirukkural = require('./Thirukkural'); // Adjust the path as needed
+const Questions = require('./mongodb/Questions'); // Adjust the path as needed
+const Thirukkural = require('./mongodb/Thirukkural'); // Adjust the path as needed
+const Hindi_Qns = require('./mongodb/Questions');
+const Russian_qns = require('./mongodb/Questions');
+const Hindikural =require('./mongodb/Thirukkural');
+const Russiankural=require('./mongodb/Thirukkural');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -27,20 +31,32 @@ mongoose.connect('mongodb://127.0.0.1:27017/CHATBOT', {
 app.use(express.json());
 
 // Endpoint to get questions based on inputs
+// Endpoint to get questions based on inputs
 app.get('/api/questions', async (req, res) => {
-    const { inputs, english_input,selectedLanguage } = req.query;
+    const { inputs, english_input,input, selectedLanguage } = req.query;
 
     // Validate the input
-    if (!inputs && !english_input) {
+    if (!inputs && !english_input && !input) {
         return res.status(400).json({ message: 'No valid inputs provided' });
     }
-    
+
+    let QuestionsModel;
+    if (selectedLanguage.toLowerCase() === 'Russian') {
+        QuestionsModel = Russian_qns;  // Use Russian questions model
+    } else if (selectedLanguage.toLowerCase() === 'Hindi') {
+        QuestionsModel = Hindi_Qns;  // Use Hindi questions model
+    } else {
+        QuestionsModel = Questions;  // Default to Tamil/English questions model
+    }
+
     let pythonScriptArgs = [];
     
     if (inputs) pythonScriptArgs.push(inputs, "inputs");
+    if (input) pythonScriptArgs.push(input, "input");
+
     if (english_input) pythonScriptArgs.push(english_input, "english_input");
     if (selectedLanguage) pythonScriptArgs.push(selectedLanguage);
-    
+
     console.log('Python script args:', pythonScriptArgs);
 
     const pythonScriptPath = path.join(__dirname, 'test2.py');
@@ -68,21 +84,20 @@ app.get('/api/questions', async (req, res) => {
         // Parse the output of the Python script
         try {
             const result = JSON.parse(output);
-            const numbers = result.numbers;  // Ensure that your Python script returns a list of numbers
+            const numbers = result.numbers;
 
             if (!numbers || numbers.length === 0) {
                 return res.status(404).json({ message: 'No questions found for the given inputs' });
             }
 
             // Fetch questions based on the numbers returned
-            const questions = await Questions.find({ number: { $in: numbers } });
+            const questions = await QuestionsModel.find({ number: { $in: numbers } });
 
             if (questions.length === 0) {
                 return res.status(404).json({ message: 'No questions found for the given numbers' });
             }
 
-           
-
+            res.status(200).json(questions);
         } catch (parseError) {
             console.error('Error parsing Python script output:', parseError);
             res.status(500).json({ message: 'Error parsing Python script output', error: parseError.message });
@@ -90,100 +105,136 @@ app.get('/api/questions', async (req, res) => {
     });
 });
 
+// Endpoint to get Kural details based on input
 app.get('/api/kurals', async (req, res) => {
-    try {
-        const {  selectedLanguage,chapterName, sectionName, verse, translation, explanation, Chapter, Chapter_Eng, section_eng, section_trans } = req.query;
+    const { selectedLanguage, chapterName, sectionName, verse, translation, explanation, Chapter, Chapter_Eng, section_eng, section_trans,chapter,chapter_group,Section,Chapter_group} = req.query;
 
-        // Validate input query parameters
-        if (!chapterName && !sectionName && !verse && !translation && !explanation && !Chapter_Eng && !section_eng && !section_trans && !Chapter) {
-            return res.status(400).json({ message: 'No valid query parameters provided' });
+    if (!chapterName && !sectionName && !verse && !translation && !explanation && !Chapter_Eng && !section_eng && !section_trans && !Chapter && !chapter && !Chapter_group && !Section && !chapter_group) {
+        return res.status(400).json({ message: 'No valid query parameters provided' });
+    }
+
+    // Select the correct Mongoose model based on the selected language
+    let KuralModel;
+    if (selectedLanguage.toLowerCase() === 'russian') {
+        KuralModel = Russiankural;  // Use Russian Kural model
+    } else if (selectedLanguage.toLowerCase() === 'hindi') {
+        KuralModel = Hindikural;  // Use Hindi Kural model
+    } else {
+        KuralModel = Thirukkural;  // Default to Tamil/English Kural model
+    }
+    
+
+    // Initialize pythonScriptArgs
+    let pythonScriptArgs = [];
+    if (selectedLanguage) pythonScriptArgs.push(selectedLanguage);
+    if (chapterName) pythonScriptArgs.push(chapterName, "chapterName");
+    if (sectionName) pythonScriptArgs.push(sectionName, "sectionName");
+    if (verse) pythonScriptArgs.push(verse, "verse");
+    if (translation) pythonScriptArgs.push(translation, "translation");
+    if (explanation) pythonScriptArgs.push(explanation, "explanation");
+    if (Chapter) pythonScriptArgs.push(Chapter, "Chapter");
+    if (chapter) pythonScriptArgs.push(chapter, "chapter");
+    if (Section) pythonScriptArgs.push(Section, "Section");
+    if (Chapter_group) pythonScriptArgs.push(Chapter_group, "Chapter_group");
+    if (chapter_group) pythonScriptArgs.push(chapter_group, "chapter_group");
+    if (Chapter_Eng) pythonScriptArgs.push(Chapter_Eng, "Chapter_Eng");
+    if (section_trans) pythonScriptArgs.push(section_trans, "section_trans");
+    if (section_eng) pythonScriptArgs.push(section_eng, "section_eng");
+    console.log('Python script args:', pythonScriptArgs);
+
+    const pythonScriptPath = path.join(__dirname, 'test.py');
+    const pythonProcess = spawn('python', [pythonScriptPath, ...pythonScriptArgs]);
+    console.log('Python script path:', pythonScriptPath);
+
+    let output = '';
+    let errorOutput = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+        output += data.toString().trim();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        errorOutput += data.toString().trim();
+    });
+
+    pythonProcess.on('close', async (code) => {
+        if (code !== 0) {
+            console.error('Python script exited with code:', code);
+            console.error('Error output:', errorOutput);
+            return res.status(500).json({ message: 'Error executing Python script', error: errorOutput });
         }
 
-        // Initialize pythonScriptArgs
-        let pythonScriptArgs = [];
-        if (selectedLanguage) pythonScriptArgs.push(selectedLanguage); 
-        if (chapterName) pythonScriptArgs.push(chapterName, "chapterName");
-        if (sectionName) pythonScriptArgs.push(sectionName, "sectionName");
-        if (verse) pythonScriptArgs.push(verse, "verse");
-        if (translation) pythonScriptArgs.push(translation, "translation");
-        if (explanation) pythonScriptArgs.push(explanation, "explanation");
-        if (Chapter) pythonScriptArgs.push(Chapter, "Chapter");
-        if (Chapter_Eng) pythonScriptArgs.push(Chapter_Eng, "Chapter_Eng");
-        if (section_trans) pythonScriptArgs.push(section_trans, "section_trans");
-        if (section_eng) pythonScriptArgs.push(section_eng, "section_eng");
-        console.log('Python script args:', pythonScriptArgs);
+        try {
+            const result = JSON.parse(output.toString());
 
-        // Execute the Python script using spawn
-        const pythonScriptPath = path.join(__dirname, 'test.py');
-        const pythonProcess = spawn('python', [pythonScriptPath, ...pythonScriptArgs]);
-        console.log('Python script path:', pythonScriptPath);
-        let output = '';
-        let errorOutput = '';
-        pythonProcess.stdout.on('data', (data) => {
-            output += data.toString().trim();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-            errorOutput += data.toString().trim();
-        });
-
-        pythonProcess.on('close', async (code) => {
-            if (code !== 0) {
-                console.error('Python script exited with code:', code);
-                console.error('Error output:', errorOutput);
-                return res.status(500).json({ message: 'Error executing Python script', error: errorOutput });
+            if (result.error) {
+                return res.status(500).json({ message: 'Error from Python script', error: result.error });
             }
 
-            // Parse the output of the Python script
-            try {
-                const result = JSON.parse(output.toString());
-
-                if (result.error) {
-                    return res.status(500).json({ message: 'Error from Python script', error: result.error });
-                }
-
-                const numbers = result.numbers;
-                if (!numbers || numbers.length === 0) {
-                    return res.status(404).json({ message: 'No Kural details found for the given parameters' });
-                }
-
-                // Fetch Kural details from MongoDB
-                const kurals = await Thirukkural.find({ number: { $in: numbers } });
-
-                if (kurals.length === 0) {
-                    return res.status(404).json({ message: 'No Kural details found for the given numbers' });
-                }
-
-                res.status(200).json(kurals);
-            } catch (parseError) {
-                console.error('Error parsing Python script output:', parseError);
-                res.status(500).json({ message: 'Error parsing Python script output', error: parseError.message });
+            const numbers = result.numbers;
+            if (!numbers || numbers.length === 0) {
+                return res.status(404).json({ message: 'No Kural details found for the given parameters' });
             }
-        });
 
-    } catch (error) {
-        console.error('Error handling request:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
+            // Fetch Kural details from the selected Kural model
+            const kurals = await KuralModel.find({ number: { $in: numbers } });
+
+            if (kurals.length === 0) {
+                return res.status(404).json({ message: 'No Kural details found for the given numbers' });
+            }
+
+            res.status(200).json(kurals);
+        } catch (parseError) {
+            console.error('Error parsing Python script output:', parseError);
+            res.status(500).json({ message: 'Error parsing Python script output', error: parseError.message });
+        }
+    });
 });
+
 app.get('/api/all-details', async (req, res) => {
     try {
         const { selectedLanguage } = req.query;
-        
-        // Adjust the aggregation based on the selected language
-        const groupByFields = selectedLanguage === 'English' 
-            ? {
-                chapterName: "$Chapter_Eng",  // Use Chapter_Eng for English
-                sectionName: "$section_eng",    // Use section_eng for English
-                verse: "$translation"            // Use translation for English
-              }
-            : {
-                chapterName: "$chapterName",     // Use chapterName for Tamil
-                sectionName: "$sectionName",     // Use sectionName for Tamil
-                verse: "$verse"                   // Use verse for Tamil
-              };
 
-        const data = await Thirukkural.aggregate([
+        let model; // Holds the appropriate Mongoose model based on language
+
+        // Select the correct fields and model based on the language
+        const groupByFields = (() => {
+            switch (selectedLanguage) {
+                case 'English':
+                    model = Thirukkural;  // English data in 'Thirukkural' model
+                    return {
+                        chapterName: "$Chapter_Eng",  // Use Chapter_Eng for English
+                        sectionName: "$section_eng",  // Use section_eng for English
+                        verse: "$translation"         // Use translation for English
+                    };
+                case 'Tamil':
+                    model = Thirukkural;  // Tamil data in 'Thirukkural' model
+                    return {
+                        chapterName: "$chapterName",   // Use chapterName for Tamil
+                        sectionName: "$sectionName",   // Use sectionName for Tamil
+                        verse: "$verse"                // Use verse for Tamil
+                    };
+                case 'Hindi':
+                    model = Hindikural;  // Hindi data in 'Hindikural' model
+                    return {
+                        chapterName: "$chapter",       // Use chapter for Hindi
+                        sectionName: "$section",       // Use section for Hindi
+                        verse: "$translation"          // Use translation for Hindi
+                    };
+                case 'Russian':
+                    model = Russiankural;  // Russian data in 'Russiankural' model
+                    return {
+                        chapterName: "$Chapter",       // Use Chapter for Russian
+                        sectionName: "$Section",       // Use Section for Russian
+                        verse: "$translation"          // Use translation for Russian
+                    };
+                default:
+                    return res.status(400).json({ message: 'Invalid language selection' });
+            }
+        })();
+
+        // Run the aggregation query
+        const data = await model.aggregate([
             {
                 $group: {
                     _id: {
@@ -224,6 +275,7 @@ app.get('/api/all-details', async (req, res) => {
             }
         ]);
 
+        // Send the aggregated data as a response
         res.status(200).json(data);
     } catch (err) {
         console.error('Error fetching all details:', err);

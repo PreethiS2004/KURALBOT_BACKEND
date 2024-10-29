@@ -17,8 +17,27 @@ const thirukkuralSchema = new mongoose.Schema({
     section_trans:{ type: String, required: true }
 });
 
+const hindischema=new mongoose.Schema({
+    chapter: { type: String, required: true },
+    chapter_group:{ type: String, required: true },
+    section: { type: String, required: true },
+    translation: { type: String, required: true },
+    number: { type: Number, required: true } 
 
+})
+const russianschema=new mongoose.Schema({
+    Chapter: { type: String, required: true },
+    Chapter_group:{ type: String, required: true },
+    Section: { type: String, required: true },
+    translation: { type: String, required: true },
+    number: { type: Number, required: true } 
+
+})
 const Thirukkural = mongoose.model('Thirukkural', thirukkuralSchema,'DETAIL1');
+const Hindikural = mongoose.model('Hindikural',hindischema,'HINDI_DETAIL');
+const Russiankural = mongoose.model('Russiankural',russianschema,'RUSSIAN_DETAIL');
 
 module.exports = Thirukkural;
+module.exports = Hindikural;
+module.exports = Russiankural; 
 

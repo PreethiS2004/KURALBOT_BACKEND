@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from transformers import AutoTokenizer, AutoModel, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModel
 import json
 import pymongo
 import sys
@@ -8,8 +8,6 @@ import string
 import warnings
 import logging
 from rapidfuzz import fuzz
-from googletrans import Translator
-import requests  # To make API calls
 
 # Ignore future warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -62,10 +60,10 @@ def cosine_similarity(vecA, vecB):
     dotProduct = np.dot(vecA, vecB)
     return dotProduct / (magnitudeA * magnitudeB)
 
-def fetch_field_from_mongodb(field):
+def fetch_field_from_mongodb(field, collection_name):
     client = pymongo.MongoClient("mongodb://127.0.0.1:27017/")
     db = client['CHATBOT']
-    collection = db['DETAIL1']
+    collection = db[collection_name]
     
     # Fetch documents that contain the specified field and the 'number' field
     docs = collection.find({field: {"$exists": True}, 'number': {"$exists": True}}, {field: 1, 'number': 1})
@@ -83,7 +81,7 @@ def fetch_field_from_mongodb(field):
     
     return field_data
 
-def process_input(user_text, field):
+def process_input(user_text, field, collection_name):
     if not isinstance(user_text, str) or not isinstance(field, str):
         raise ValueError("Both user_text and field must be strings.")
     
@@ -97,7 +95,7 @@ def process_input(user_text, field):
     if len(embeddings_user_text) == 0:
         raise ValueError("Failed to generate embeddings for the user text.")
     
-    field_data = fetch_field_from_mongodb(field)
+    field_data = fetch_field_from_mongodb(field, collection_name)
     
     if not field_data:
         raise ValueError(f"No data found in MongoDB for field: {field}")
@@ -134,96 +132,28 @@ def process_input(user_text, field):
     logging.info(f"Best numbers: {best_numbers}")
     return {'numbers': best_numbers}
 
-def translate_to_tamil(text):
-    translator = Translator()
-    try:
-        # Translate from Hindi to Tamil
-        translated = translator.translate(text, src='hi', dest='ta')
-        logging.info(f"Translated from Hindi to Tamil: {translated.text}")
-        return translated.text
-    except Exception as e:
-        logging.error(f"Translation error: {str(e)}")
-        raise ValueError("Translation from Hindi to Tamil failed.")
-
-# Load the translation model for Russian
-def load_translation_model():
-    model_name = "utrobinmv/t5_translate_en_ru_zh_small_1024"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    return tokenizer, model
-
-# Translate from Russian to English
-def translate_russian_to_english(text):
-    try:
-        tokenizer, model = load_translation_model()
-        inputs = tokenizer.encode(f"translate Russian to English: {text}", return_tensors="pt")
-        outputs = model.generate(inputs, max_length=1024, num_beams=5, early_stopping=True)
-        translated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return translated_text
-    except Exception as e:
-        logging.error(f"Translation error: {str(e)}")
-        raise ValueError("Translation from Russian to English failed.")
-
-# Check if the word exists in the English dictionary
-def check_word_in_dictionary(word):
-    try:
-        response = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}")
-        return response.status_code == 200
-    except Exception as e:
-        logging.error(f"API call error: {str(e)}")
-        return False
-
-# Check the percentage of English words
-def check_english_percentage(user_text):
-    words = user_text.split()
-    total_words = len(words)
-    
-    if total_words == 0:
-        return False
-    
-    found_count = 0
-    
-    for word in words:
-        if check_word_in_dictionary(word):
-            found_count += 1
-    
-    percentage = (found_count / total_words) * 100
-    logging.info(f"English word percentage: {percentage:.2f}%")
-    return percentage > 50
-
 def main():
     if len(sys.argv) != 4:
-        print(json.dumps({"error": "Usage: python test.py <user_text> <field> <selected_language> "}))
+        print(json.dumps({"error": "Usage: python test.py <user_text> <field> <selected_language>"}))
         sys.exit(1)
     
     user_text = sys.argv[2]
     field = sys.argv[3]
     selected_language = sys.argv[1]
     
-    original_user_text = user_text  # Save the original user text for printing later
-    
-    # Check the language and handle translation if necessary
-    if selected_language.lower() == 'hindi':
-        try:
-            user_text = translate_to_tamil(user_text)
-        except Exception as e:
-            print(json.dumps({"error": str(e)}))
-            sys.exit(1)
-    
+    # Check the language and set the collection name
+    if selected_language.lower() == 'tamil':
+        collection_name = 'DETAIL1'
+    elif selected_language.lower() == 'english':
+        collection_name = 'DETAIL1'
     elif selected_language.lower() == 'russian':
-        try:
-            user_text = translate_russian_to_english(user_text)
-            # Check if the translated word exists in the dictionary
-            if check_english_percentage(user_text):
-                field = "Chapter_Eng"
-            else:
-                field = "Chapter"
-        except Exception as e:
-            print(json.dumps({"error": str(e)}))
-            sys.exit(1)
+        collection_name = 'RUSSIAN_DETAIL'
+    else:
+        print(json.dumps({"error": "Invalid language. Choose 'tamil' or 'english'."}))
+        sys.exit(1)
     
     try:
-        result = process_input(user_text, field)
+        result = process_input(user_text, field, collection_name)
         print(json.dumps(result))  # Ensure this is the only output
     except Exception as e:
         logging.error(f"Error in main: {str(e)}")

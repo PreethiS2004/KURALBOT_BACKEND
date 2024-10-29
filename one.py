@@ -1,40 +1,51 @@
-import sys
-import json
-from pymongo import MongoClient
-from googletrans import Translator
 
-# Function to translate Tamil text to English
-def translate_text(tamil_text):
-    translator = Translator()
-    translation = translator.translate(tamil_text, src='ta', dest='en')
-    return translation.text
+# Step 1: Import Libraries
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaForCausalLM
 
-def update_verses_with_translation():
-    # Connect to MongoDB
-    client = MongoClient("mongodb://127.0.0.1:27017/")
-    db = client['CHATBOT']
-    collection = db['DETAIL1']
+# Step 2: Load Models and Tokenizers
+# Load the first model (GPT-2)
+gpt_model_name = "EleutherAI/gpt-j-6B"
+gpt_model = GPT2LMHeadModel.from_pretrained(gpt_model_name)
+gpt_tokenizer = GPT2Tokenizer.from_pretrained(gpt_model_name)
 
-    # Fetch all documents
-    documents = collection.find()
 
-    for document in documents:
-        tamil_verse = document.get('verse')
-        if tamil_verse:
-            try:
-                # Translate the Tamil verse to English
-                translated_verse = translate_text(tamil_verse)
 
-                # Update the document with the new field
-                collection.update_one(
-                    {'_id': document['_id']},
-                    {'$set': {'verse_eng': translated_verse}}
-                )
-                print(f"Updated verse for document ID {document['_id']}: {translated_verse}")
-            except Exception as e:
-                print(f"Error translating verse for document ID {document['_id']}: {e}")
+# Step 3: Simulated Data Retrieval
+def fetch_data(prompt):
+    # Simulating fetching data based on a prompt
+    if prompt.lower() == "kural 1":
+        return "Kural 1: A"
+    elif prompt.lower() == "kural 2":
+        return "Kural 2: B"
+    else:
+        return "Unknown prompt."
 
-if __name__ == '__main__':
-    update_verses_with_translation()
+# Step 4: Function to Generate Text with GPT-2
+def generate_text_with_gpt(data, max_length=50):
+    input_ids = gpt_tokenizer.encode(data, return_tensors='pt')
+    output = gpt_model.generate(input_ids, max_length=max_length, num_return_sequences=1)
+    return gpt_tokenizer.decode(output[0], skip_special_tokens=True)
 
-#https://huggingface.co/datasets/aitamilnadu/thirukkural_instruct?row=32
+# Step 5: Function to Further Process Output with LLaMA
+
+# Step 6: Main Interaction Logic
+def main_interaction():
+    # Step 6.1: Get initial input from the user
+    user_input = input("Enter your prompt (e.g., 'Kural 1' or 'Kural 2'): ")
+
+    # Step 6.2: Fetch simulated data based on user input
+    fetched_data = fetch_data(user_input)
+    print("Fetched Data:")
+    print(fetched_data)
+
+    # Step 6.3: Generate initial output using GPT-2
+    initial_output = generate_text_with_gpt(fetched_data)
+    print("Initial Output from GPT-2:")
+    print(initial_output)
+
+    # Step 6.4: Refine the initial output using LLaMA
+    
+
+# Step 7: Run the main interaction
+if __name__ == "__main__":
+    main_interaction()
